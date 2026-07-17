@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <link rel="stylesheet" href="dapp.css">
+</head>
+
+<body>
+  <div class="root">
+    <header>
+      <div class="logo-row">
+        <div class="logo-hex">
+          <img src="./public/logo.png" alt="Logo">
+        </div>
+        <div class="logo-label">x</div>
+        <div class="logo-hex">
+          <img src="./public/fhnwlogo.png" alt="Logo">
+        </div>
+        <div class="logo-label">x</div>
+        <div class="logo-hex">
+          <img src="./public/me.png" alt="Logo">
+        </div>
+      </div>
+      <h1>Student Credential Verification<br><span class="accent">without Identity Disclosure</span></h1>
+      <p class="subtitle">Bachelor Thesis Prototype</p>
+    </header>
+
+    <div class="status-bar">
+      <div class="status-dot" id="serverDot"></div>
+      <span class="status-text" id="serverText">Connecting to local server...</span>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-icon icon-issuer">🏛️</div>
+          <div>
+            <div class="panel-title">University</div>
+            <div class="panel-role">Issuer</div>
+          </div>
+        </div>
+        <div class="field-group">
+          <label>Matriculation No.</label>
+          <input type="text" id="studentId" value="23-545-783" />
+        </div>
+        <div class="field-group">
+          <label>Programme</label>
+          <select id="programme">
+            <option>BSc Wirtschaftsinformatik</option>
+            <option>BSc Business Information Technology</option>
+            <option>BSc Betriebsökonomie</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label>Enrolled until</label>
+          <input type="text" id="enrolledUntil" value="30.09.2026" />
+        </div>
+        <button class="btn btn-purple" id="btnIssue" onclick="doIssue()">
+          <span id="issueText">Issue Credential</span>
+        </button>
+        <div id="issuerError" class="error-box" style="display:none"></div>
+        <button class="btn btn-ghost" id="btnDeploy" onclick="doDeploy()" disabled>
+          <span id="deployText">Deploy Contract to Midnight</span>
+        </button>
+        <div>
+          <div class="hash-box">
+            <div class="hash-label">CONTRACT</div>
+            <div class="status-addr" id="contractAddrBar">No contracts deployed...</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-icon icon-student">🎓</div>
+          <div>
+            <div class="panel-title">Student</div>
+            <div class="panel-role">Holder</div>
+          </div>
+        </div>
+        <div id="issuerResult" style="display:none">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <button class="btn btn-teal" id="btnShowHash" onclick="showQR('hash')"
+              style="flex:1;padding:8px;font-size:13px">
+              Credential Hash
+            </button>
+            <button class="btn btn-ghost" id="btnShowSig" onclick="showQR('sig')"
+              style="flex:1;padding:8px;font-size:13px">
+              University Signature
+            </button>
+          </div>
+          <div class="hash-box" style="margin-bottom:10px">
+            <div class="hash-value" id="currentValue" style="word-break:break-all">—</div>
+          </div>
+          <div class="qr-box">
+            <div id="qrCanvas"></div>
+          </div>
+        </div>
+        <div id="studentNonce" style="display:none">
+          <div class="hash-box" style="margin-bottom:10px">
+            <div class="hash-label">Nonce</div>
+            <div class="hash-value teal" id="nonceValue">—</div>
+          </div>
+          <button class="btn btn-teal" id="btnGenerateProof" onclick="doGenerateProof()" disabled>
+            <span id="generateProofText">Generate ZK Proof</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-icon icon-verifier">🔍</div>
+          <div>
+            <div class="panel-title">Discount Service</div>
+            <div class="panel-role">Verifier</div>
+          </div>
+        </div>
+        <div id="verifierReady" style="display:none">
+          <div class="hash-box" style="margin-bottom:10px">
+            <div class="hash-label">Status</div>
+            <div class="hash-value amber">Proof received — ready to verify</div>
+          </div>
+          <button class="btn btn-teal" id="btnVerify" onclick="doVerify()">
+            <span id="verifyText">Verify Proof</span>
+          </button>
+        </div>
+        <div id="verifierResult" style="display:none">
+          <div class="hash-box" style="margin-bottom:8px">
+            <div class="hash-label">Enrollment Verified</div>
+            <div id="verifyResultValue" class="hash-value green" style="font-size:32px;font-weight:800">TRUE</div>
+          </div>
+          <div class="hash-box" style="margin-bottom:8px">
+            <div class="hash-label">Transaction Hash (Midnight Preprod)</div>
+            <div class="hash-value amber" id="verifyTxHash">—</div>
+          </div>
+          <div class="hash-box" style="margin-bottom:8px">
+            <div class="hash-label">Nonce (burned — prevents reuse)</div>
+            <div class="hash-value purple" id="verifyNonce">—</div>
+          </div>
+          <div style="margin-top:10px">
+            <span class="badge badge-done">✓ Proof verified on Midnight Preprod</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reset-row">
+      <button class="btn btn-ghost" style="max-width:200px;margin:0 auto;display:flex" onclick="location.reload()">↺
+        Reset</button>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000/api';
+    let state = { issued: false, deployed: false };
+
+    async function checkStatus() {
+      try {
+        const r = await fetch(`${API}/status`);
+        const d = await r.json();
+        document.getElementById('serverDot').className = 'status-dot online';
+        document.getElementById('serverText').textContent = 'Server online';
+        if (d.hasCredential) {
+          state.issued = true;
+          document.getElementById('btnDeploy').disabled = false;
+        }
+        if (d.hasContractAddr) {
+          state.deployed = true;
+          document.getElementById('btnGenerateProof').disabled = false;
+          const addr = d.contractAddress;
+          document.getElementById('contractAddrBar').textContent = addr;
+        }
+      } catch (e) {
+        document.getElementById('serverDot').className = 'status-dot offline';
+        document.getElementById('serverText').textContent = 'Server offline — run: npm run server';
+      }
+    }
+
+    let _credHash = '';
+    let _credSig = '';
+
+    function showQR(type) {
+      const isHash = type === 'hash';
+      document.getElementById('btnShowHash').className = isHash
+        ? 'btn btn-teal' : 'btn btn-ghost';
+      document.getElementById('btnShowSig').className = isHash
+        ? 'btn btn-ghost' : 'btn btn-teal';
+      const val = isHash ? _credHash : _credSig;
+      document.getElementById('currentValue').textContent = val;
+      document.getElementById('qrCanvas').innerHTML = '';
+      new QRCode(document.getElementById('qrCanvas'), {
+        text: val,
+        width: 180,
+        height: 180,
+        colorDark: '#00c9a7',
+        colorLight: '#080c14',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    }
+
+    async function doIssue() {
+      const btn = document.getElementById('btnIssue');
+      btn.disabled = true;
+      document.getElementById('issuerError').style.display = 'none';
+      try {
+        const res = await fetch(`${API}/issue`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: document.getElementById('studentId').value,
+            programme: document.getElementById('programme').value,
+            enrolledUntil: document.getElementById('enrolledUntil').value,
+          })
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error);
+
+        _credHash = d.credentialHash;
+        _credSig = d.issuerSignature;
+
+        document.getElementById('issuerResult').style.display = 'block';
+        document.getElementById('issueText').textContent = 'Credential Issued';
+        document.getElementById('btnDeploy').disabled = false;
+        state.issued = true;
+
+        loadStudentWallet();
+        showQR('hash');
+
+      } catch (e) {
+        document.getElementById('issuerError').textContent = e.message;
+        document.getElementById('issuerError').style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('issueText').textContent = 'Issue Credential';
+      }
+    }
+
+    async function doDeploy() {
+      const btn = document.getElementById('btnDeploy');
+      btn.disabled = true;
+      document.getElementById('deployText').textContent = 'Deploying...';
+      document.getElementById('issuerError').style.display = 'none';
+      try {
+        const res = await fetch(`${API}/deploy`, { method: 'POST' });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error);
+        const short = d.address.slice(0, 20) + '...';
+        document.getElementById('contractAddrBar').textContent = short;
+        document.getElementById('deployText').textContent = 'Deployed';
+        state.deployed = true;
+        document.getElementById('btnGenerateProof').disabled = false;
+      } catch (e) {
+        document.getElementById('issuerError').textContent = e.message;
+        document.getElementById('issuerError').style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('deployText').textContent = 'Deploy Contract to Midnight';
+      }
+    }
+
+    function loadStudentWallet() {
+      document.getElementById('studentNonce').style.display = 'block';
+    }
+
+    async function doGenerateProof() {
+      const btn = document.getElementById('btnGenerateProof');
+      btn.disabled = true;
+      document.getElementById('generateProofText').textContent = 'Generating ZK Proof...';
+      await new Promise(r => setTimeout(r, 1200));
+
+      document.getElementById('generateProofText').textContent = '✓ Proof Generated';
+      document.getElementById('verifierReady').style.display = 'block';
+    }
+
+    async function doVerify() {
+      const btn = document.getElementById('btnVerify');
+      btn.disabled = true;
+      document.getElementById('verifyText').textContent = 'Verifying...';
+      try {
+        const res = await fetch(`${API}/verify`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        document.getElementById('verifyText').textContent = '✓ Verified';
+        document.getElementById('nonceValue').textContent = data.nonce.slice(0, 32) + '...';
+
+        document.getElementById('verifierReady').style.display = 'none';
+        document.getElementById('verifierResult').style.display = 'block';
+        document.getElementById('verifyTxHash').textContent = data.txHash;
+        document.getElementById('verifyNonce').textContent = data.nonce.slice(0, 32) + '...';
+        document.getElementById('verifyResultValue').textContent = 'TRUE';
+        document.getElementById('verifyResultValue').style.color = '#22c55e';
+        document.getElementById('verifyResultValue').style.fontSize = '32px';
+        document.getElementById('verifyResultValue').style.fontWeight = '800';
+      } catch (e) {
+        const msg = e.message || '';
+        const isInvalidSig = msg.includes('Invalid issuer signature') ||
+          msg.includes('failed assert');
+
+        document.getElementById('verifierReady').style.display = 'none';
+        document.getElementById('verifierResult').style.display = 'block';
+
+        if (isInvalidSig) {
+          document.getElementById('verifyTxHash').textContent = 'Proof rejected — not submitted';
+          document.getElementById('verifyNonce').textContent = 'N/A';
+          document.getElementById('verifyResultValue').textContent = 'FALSE';
+          document.getElementById('verifyResultValue').className = 'hash-value';
+          document.getElementById('verifyResultValue').style.color = 'var(--red)';
+          document.getElementById('verifyResultValue').style.fontSize = '32px';
+          document.getElementById('verifyResultValue').style.fontWeight = '800';
+        } else {
+          alert('❌ Verify failed: ' + e.message);
+        }
+        btn.disabled = false;
+        document.getElementById('verifyText').textContent = 'Verify Proof';
+      }
+    }
+
+    checkStatus();
+    setInterval(checkStatus, 10000);
+  </script>
+</body>
+</html>
